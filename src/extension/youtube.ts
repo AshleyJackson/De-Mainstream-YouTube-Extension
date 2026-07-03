@@ -158,6 +158,7 @@ interface ChannelGroup {
       const found = txt
         .replace('/user/', '')
         .replace('/channel/', '')
+        .replace('/@', '')
         .toLowerCase();
 
       if (blockedChannelIds.indexOf(found) > -1) {

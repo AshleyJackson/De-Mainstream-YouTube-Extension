@@ -57,8 +57,9 @@ async function initStorage(): Promise<void> {
     log.debug('Legacy enabled IDs', { count: enabledSet.size });
 
     const migrated = CHANNEL_DEFINITIONS.map((group) => {
-      const allEnabled = group.channelIds.every((chId) => enabledSet.has(chId.toLowerCase()));
-      return { ...group, enabled: allEnabled };
+      // A group is enabled if ANY of its legacy-matching channelIds were enabled
+      const anyEnabled = group.channelIds.some((chId) => enabledSet.has(chId.toLowerCase()));
+      return { ...group, enabled: anyEnabled };
     });
 
     await chrome.storage.local.set({ [STORAGE_KEY]: migrated });

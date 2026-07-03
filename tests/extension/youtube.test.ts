@@ -12,7 +12,7 @@ function filterVideos(blockedChannelIds: string[]) {
 
   for (const el of links) {
     const txt = el.getAttribute('href') ?? el.getAttribute('title') ?? '';
-    const found = txt.replace('/user/', '').replace('/channel/', '').toLowerCase();
+    const found = txt.replace('/user/', '').replace('/channel/', '').replace('/@', '').toLowerCase();
     if (lowerBlocked.indexOf(found) > -1) {
       const parent = el.closest('ytd-video-renderer, ytd-compact-video-renderer');
       parent?.remove();
@@ -68,6 +68,18 @@ describe('youtube content script — video filtering (group-based)', () => {
     document.body.innerHTML = `
       <ytd-video-renderer>
         <a class="yt-formatted-string yt-simple-endpoint" href="/user/CNN">CNN</a>
+      </ytd-video-renderer>
+    `;
+
+    filterVideos(['cnn']);
+
+    expect(document.querySelector('ytd-video-renderer')).toBeNull();
+  });
+
+  it('removes videos matching @handle format', () => {
+    document.body.innerHTML = `
+      <ytd-video-renderer>
+        <a class="yt-formatted-string yt-simple-endpoint" href="/@cnn">CNN</a>
       </ytd-video-renderer>
     `;
 

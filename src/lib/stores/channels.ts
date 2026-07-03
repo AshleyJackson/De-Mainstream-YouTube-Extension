@@ -12,9 +12,14 @@ export async function loadGroups(): Promise<void> {
         resolve(result);
       });
     });
-    const parsed = ChannelGroupArraySchema.parse(values);
-    log.info('Groups loaded', { count: parsed.length, enabled: parsed.filter(g => g.enabled).length });
-    groups.set(parsed);
+    const parsed = ChannelGroupArraySchema.safeParse(values);
+    if (!parsed.success) {
+      log.warn('Groups response failed validation, using empty', { error: parsed.error?.message ?? 'unknown' });
+      groups.set([]);
+      return;
+    }
+    log.info('Groups loaded', { count: parsed.data.length, enabled: parsed.data.filter(g => g.enabled).length });
+    groups.set(parsed.data);
   } catch (err) {
     log.error('Failed to load groups', { error: String(err) });
     groups.set([]);

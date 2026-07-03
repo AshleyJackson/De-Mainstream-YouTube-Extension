@@ -111,10 +111,10 @@ describe('background service worker', () => {
     const cnn = stored.find((g: { id: string }) => g.id === 'cnn');
     expect(cnn.enabled).toBe(true);
 
-    // BBC group should be enabled only if ALL its channelIds were enabled
-    // BBC was disabled, bbcnews was enabled → not all enabled → group disabled
+    // BBC group should be enabled if ANY of its channelIds were enabled in legacy
+    // BBC was disabled, bbcnews was enabled → at least one enabled → group enabled
     const bbc = stored.find((g: { id: string }) => g.id === 'bbc');
-    expect(bbc.enabled).toBe(false);
+    expect(bbc.enabled).toBe(true);
 
     // All groups should have channelIds arrays
     for (const g of stored) {

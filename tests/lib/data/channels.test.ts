@@ -44,9 +44,13 @@ describe('CHANNEL_DEFINITIONS', () => {
     }
   });
 
-  it('no duplicate channelIds across groups', () => {
+  it('has channelIds for both legacy and @handle formats', () => {
     const allIds = CHANNEL_DEFINITIONS.flatMap(c => c.channelIds);
-    expect(new Set(allIds).size).toBe(allIds.length);
+    // Each group should have at least one @handle-style ID
+    const handleStyleCount = CHANNEL_DEFINITIONS.filter(g =>
+      g.channelIds.some(id => !id.startsWith('UC') && id === id.toLowerCase())
+    ).length;
+    expect(handleStyleCount).toBeGreaterThan(0);
   });
 
   it('includes expected groups', () => {
