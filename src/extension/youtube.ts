@@ -90,32 +90,42 @@ interface ChannelGroup {
 
     log.info('Adding "Daily Popular Videos" sidebar link', { isActive });
 
+    // Detect dark mode via YouTube's [dark] attribute on <html>
+    const isDark = document.documentElement.hasAttribute('dark');
+
     const btn = document.createElement('a');
     btn.href =
       'https://www.youtube.com/results?search_query=youtube&sp=CAMSBAgCEAE%253D';
+    btn.title = 'Daily Popular Videos';
     Object.assign(btn.style, {
-      display: 'block',
+      display: 'flex',
+      alignItems: 'center',
       height: '40px',
       width: '100%',
-      lineHeight: '40px',
       padding: '0 28px',
       cursor: 'pointer',
       boxSizing: 'border-box',
       textDecoration: 'none',
-      backgroundColor: isActive ? '#d9d9d9' : '',
+      backgroundColor: isActive
+        ? (isDark ? '#3a3a3a' : '#d9d9d9')
+        : 'transparent',
     });
 
     btn.addEventListener('mouseover', () => {
-      btn.style.backgroundColor = '#E7E7E7';
+      btn.style.backgroundColor = isDark ? '#3f3f3f' : '#e7e7e7';
     });
     btn.addEventListener('mouseout', () => {
-      if (!isActive) btn.style.removeProperty('background-color');
+      if (isActive) {
+        btn.style.backgroundColor = isDark ? '#3a3a3a' : '#d9d9d9';
+      } else {
+        btn.style.backgroundColor = 'transparent';
+      }
     });
 
     const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svgEl.setAttribute('viewBox', '0 0 24 24');
     svgEl.setAttribute('fill', 'none');
-    svgEl.setAttribute('stroke', isActive ? '#fc0d1b' : '#909090');
+    svgEl.setAttribute('stroke', isActive ? '#fc0d1b' : (isDark ? '#aaa' : '#909090'));
     svgEl.setAttribute('stroke-width', '2');
     svgEl.setAttribute('stroke-linecap', 'round');
     svgEl.setAttribute('stroke-linejoin', 'round');
@@ -138,9 +148,10 @@ interface ChannelGroup {
     text.innerHTML = 'Daily Popular Videos';
     Object.assign(text.style, {
       display: 'inline-block',
-      color: isActive ? '#000' : 'rgba(17,17,17,0.8)',
+      color: isActive
+        ? (isDark ? '#fff' : '#000')
+        : (isDark ? 'rgba(255,255,255,0.8)' : 'rgba(17,17,17,0.8)'),
       fontSize: '14px',
-      lineHeight: '40px',
       textDecoration: 'none',
       verticalAlign: 'middle',
       fontWeight: isActive ? '500' : '',
@@ -148,7 +159,11 @@ interface ChannelGroup {
 
     btn.appendChild(svgEl);
     btn.appendChild(text);
-    sidebarList.appendChild(btn);
+    // Insert two links below Shorts (Home → Shorts → Subs → You → DPV)
+    const sidebarItems = sidebarList.children;
+    // Target index 4 (0=Home, 1=Shorts, 2=Subs heading, 3=Subs, 4=insert after)
+    const insertAfter = sidebarItems.length > 3 ? sidebarItems[3] : null;
+    sidebarList.insertBefore(btn, insertAfter?.nextSibling ?? null);
     addedDailyTopLink = true;
     return true;
   }
