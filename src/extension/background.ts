@@ -86,12 +86,16 @@ async function getGroups() {
 }
 
 async function sendYouTubeUpdate(data: unknown): Promise<void> {
-  const tabs = await chrome.tabs.query({ url: 'https://www.youtube.com/*' });
-  log.debug('Notifying YouTube tabs', { tabCount: tabs.length, update: data });
-  for (const tab of tabs) {
-    chrome.tabs.sendMessage(tab.id!, data).catch((err) => {
-      log.warn('Failed to send message to tab', { tabId: tab.id, error: String(err) });
-    });
+  try {
+    const tabs = await chrome.tabs.query({ url: 'https://www.youtube.com/*' });
+    log.debug('Notifying YouTube tabs', { tabCount: tabs.length, update: data });
+    for (const tab of tabs) {
+      chrome.tabs.sendMessage(tab.id!, data).catch(() => {
+        // Tab may not have content script injected — this is normal
+      });
+    }
+  } catch (err) {
+    log.debug('Failed to query tabs', { error: String(err) });
   }
 }
 

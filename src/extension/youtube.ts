@@ -15,6 +15,7 @@ interface ChannelGroup {
   const searchFormInput = searchForm?.querySelector<HTMLInputElement>('#search');
 
   let blockedChannelIds: string[] = [];
+  let blockedDisplayNames: string[] = [];
   let addedDailyTopLink = false;
   let observingTargetNode = false;
 
@@ -29,20 +30,27 @@ interface ChannelGroup {
       }
 
       const groups = values as ChannelGroup[];
-      const enabledCount = groups.filter((g) => g.enabled).length;
-      log.info('Received groups', { total: groups.length, enabled: enabledCount });
+      const enabledGroups = groups.filter((g) => g.enabled);
+      log.info('Received groups', { total: groups.length, enabled: enabledGroups.length });
 
-      blockedChannelIds = groups
-        .filter((g) => g.enabled)
+      blockedChannelIds = enabledGroups
         .flatMap((g) => g.channelIds)
         .map((id) => id.toLowerCase());
 
-      log.debug('Blocked channel IDs', { count: blockedChannelIds.length });
+      blockedDisplayNames = enabledGroups
+        .map((g) => g.name.toLowerCase());
+
+      log.info('Blocked IDs and names', { idCount: blockedChannelIds.length, nameCount: blockedDisplayNames.length });
+      log.debug('Blocked channel IDs sample', { ids: blockedChannelIds.slice(0, 20) });
+      log.debug('Blocked display names sample', { names: blockedDisplayNames.slice(0, 20) });
       callback?.();
     });
   }
 
-  getGroups();
+  getGroups(() => {
+    log.info('Initial groups loaded, filtering');
+    waitForVideoResults();
+  });
 
   searchForm?.addEventListener('submit', () => {
     log.debug('Search form submitted, filtering results');
@@ -148,24 +156,52 @@ interface ChannelGroup {
   // ── Block videos from enabled groups' channelIds ─────────────
 
   function waitForVideoResults(): void {
-    const links = document.querySelectorAll<HTMLAnchorElement>(
-      'ytd-video-renderer a.yt-formatted-string.yt-simple-endpoint, yt-formatted-string.ytd-channel-name',
-    );
     let removedCount = 0;
 
-    for (const el of links) {
-      const txt = el.getAttribute('href') ?? el.getAttribute('title') ?? '';
-      const found = txt
+    // Strategy 1: Match channel links by href (covers /@handle, /channel/, /user/ formats)
+    const channelLinks = document.querySelectorAll<HTMLAnchorElement>(
+      'ytd-video-renderer ytd-channel-name a.yt-simple-endpoint, ' +
+      'ytd-compact-video-renderer ytd-channel-name a.yt-simple-endpoint, ' +
+      'ytd-video-renderer #channel-info a.yt-simple-endpoint',
+    );
+
+    for (const el of channelLinks) {
+      const href = el.getAttribute('href') ?? '';
+      const found = href
         .replace('/user/', '')
         .replace('/channel/', '')
         .replace('/@', '')
         .toLowerCase();
 
-      if (blockedChannelIds.indexOf(found) > -1) {
+      log.debug('Checking channel link', { href, found });
+
+      if (found && blockedChannelIds.indexOf(found) > -1) {
         const parent = el.closest('ytd-video-renderer, ytd-compact-video-renderer');
         if (parent) {
           parent.remove();
           removedCount++;
+          log.debug('Removed by href match', { found });
+        }
+      }
+    }
+
+    // Strategy 2: Match by channel name text content (fallback for layout changes)
+    const channelNameEls = document.querySelectorAll<HTMLElement>(
+      'ytd-video-renderer yt-formatted-string.ytd-channel-name, ' +
+      'ytd-compact-video-renderer yt-formatted-string.ytd-channel-name',
+    );
+
+    for (const el of channelNameEls) {
+      const text = (el.textContent ?? '').trim().toLowerCase();
+      if (!text) continue;
+
+      // Match against both channel IDs and display names
+      if (blockedChannelIds.indexOf(text) > -1 || blockedDisplayNames.indexOf(text) > -1) {
+        const parent = el.closest('ytd-video-renderer, ytd-compact-video-renderer');
+        if (parent && parent.isConnected) {
+          parent.remove();
+          removedCount++;
+          log.debug('Removed by name match', { name: text });
         }
       }
     }
@@ -197,6 +233,7 @@ interface ChannelGroup {
   // ── Bootstrap ─────────────────────────────────────────────────
 
   let attempts = 0;
+  let bootstrapDone = false;
   const interval = window.setInterval(() => {
     attempts++;
 
@@ -211,12 +248,16 @@ interface ChannelGroup {
       }
     }
 
-    if (addedDailyTopLink && targets.length) {
+    // Run filter each tick — safe no-op until getGroups populates the arrays
+    waitForVideoResults();
+
+    // Only stop polling once we've confirmed a non-empty blocked list
+    // AND found the sidebar + ytd-app content elements
+    if (!bootstrapDone && addedDailyTopLink && targets.length && blockedChannelIds.length > 0) {
+      bootstrapDone = true;
       clearInterval(interval);
       log.info('Bootstrap complete', { attempt: attempts });
     }
-
-    waitForVideoResults();
 
     if (attempts > 20 && !addedDailyTopLink) {
       log.warn('Could not find sidebar after 20 attempts, giving up on daily link');
@@ -224,7 +265,9 @@ interface ChannelGroup {
   }, 100);
 
   setTimeout(() => {
-    clearInterval(interval);
-    log.debug('Bootstrap timeout reached (10s), clearing interval');
+    if (!bootstrapDone) {
+      clearInterval(interval);
+      log.warn('Bootstrap timeout reached (10s), clearing interval');
+    }
   }, 10_000);
 })();

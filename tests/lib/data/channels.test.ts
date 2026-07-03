@@ -67,7 +67,7 @@ describe('CHANNEL_DEFINITIONS', () => {
     const cbs = CHANNEL_DEFINITIONS.find(c => c.id === 'cbs');
     expect(cbs).toBeDefined();
     expect(cbs!.channelIds.length).toBeGreaterThan(1);
-    expect(cbs!.channelIds).toContain('CBS');
+    expect(cbs!.channelIds).toContain('cbs');
 
     const bbc = CHANNEL_DEFINITIONS.find(c => c.id === 'bbc');
     expect(bbc).toBeDefined();

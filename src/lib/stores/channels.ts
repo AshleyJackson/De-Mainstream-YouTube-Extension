@@ -28,23 +28,32 @@ export async function loadGroups(): Promise<void> {
 
 export async function toggleGroup(id: string, enabled: boolean): Promise<void> {
   log.info('Toggling group', { id, enabled });
+
+  // Optimistic local update
+  groups.update(list => list.map(g => g.id === id ? { ...g, enabled } : g));
+
   try {
     chrome.runtime.sendMessage({ action: 'set', groupId: id, enabled });
   } catch (err) {
     log.error('Failed to toggle group', { id, error: String(err) });
   }
+
+  // Re-sync from background after a tick to ensure consistency
+  setTimeout(() => loadGroups(), 100);
 }
 
 export async function setAllEnabled(enabled: boolean): Promise<void> {
   log.info('Setting all groups', { enabled });
+
+  // Optimistic local update
+  groups.update(list => list.map(g => ({ ...g, enabled })));
+
   try {
     chrome.runtime.sendMessage({ action: 'set_all', enabled });
-    groups.update(list => {
-      const updated = list.map(g => ({ ...g, enabled }));
-      log.debug('Store updated optimistically', { count: updated.length });
-      return updated;
-    });
   } catch (err) {
     log.error('Failed to set all groups', { error: String(err) });
   }
+
+  // Re-sync from background after a tick
+  setTimeout(() => loadGroups(), 100);
 }
