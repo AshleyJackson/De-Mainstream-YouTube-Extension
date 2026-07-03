@@ -1,10 +1,9 @@
-// Background Service Worker for De-Mainstream YouTube Extension (MV3)
+import type { Channel } from '$lib/types';
 
-// Channel definitions
-const CHANNELS = [
+export const CHANNEL_DEFINITIONS: Omit<Channel, 'enabled'>[] = [
   { "id": "AETV", "name": "A&E", "icon": "img/channels/a-e.jpg" },
   { "id": "ABCNews", "name": "ABC News", "icon": "img/channels/abc-news.jpg" },
-  { "name": "Access", "id": "AccessHollywood", "icon": "img/channels/access.jpg" },
+  { "id": "AccessHollywood", "name": "Access", "icon": "img/channels/access.jpg" },
   { "id": "AlJazeeraEnglish", "name": "Al Jazeera English", "icon": "img/channels/al-jazeera-english.jpg" },
   { "id": "AssociatedPress", "name": "Associated Press", "icon": "img/channels/associated-press.jpg" },
   { "id": "BBC", "name": "BBC", "icon": "img/channels/bbc.jpg" },
@@ -76,77 +75,5 @@ const CHANNELS = [
   { "id": "Americanvogue", "name": "Vogue", "icon": "img/channels/vogue.jpg" },
   { "id": "voxdotcom", "name": "Vox", "icon": "img/channels/vox.jpg" },
   { "id": "WashingtonPost", "name": "Washington Post", "icon": "img/channels/washington-post.jpg" },
-  { "id": "yahoo", "name": "Yahoo", "icon": "img/channels/yahoo.jpg" }
+  { "id": "yahoo", "name": "Yahoo", "icon": "img/channels/yahoo.jpg" },
 ];
-
-const STORAGE_KEY = 'demainstream';
-
-// Initialize storage with default values if not set
-async function initStorage() {
-  const result = await chrome.storage.local.get(STORAGE_KEY);
-  if (!result[STORAGE_KEY]) {
-    const defaults = CHANNELS.map(ch => ({ ...ch, enabled: true }));
-    await chrome.storage.local.set({ [STORAGE_KEY]: defaults });
-  }
-}
-
-// Send a message to the active YouTube tab
-async function sendYouTubeUpdate(data) {
-  try {
-    const tabs = await chrome.tabs.query({ url: 'https://www.youtube.com/*' });
-    for (const tab of tabs) {
-      chrome.tabs.sendMessage(tab.id, data).catch(() => {});
-    }
-  } catch (e) {
-    // Silently fail if no tabs
-  }
-}
-
-// Handle messages from the popup
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  switch (message.action) {
-    case 'get_all':
-      chrome.storage.local.get(STORAGE_KEY).then(result => {
-        sendResponse(result[STORAGE_KEY] || []);
-      });
-      return true; // Keep channel open for async response
-
-    case 'set':
-      setChannelEnabled(message.channelId, message.enabled).then(() => {
-        sendYouTubeUpdate({ type: 'set', channelId: message.channelId });
-        sendResponse({ success: true });
-      });
-      return true;
-
-    case 'set_all':
-      setAllChannelsEnabled(message.enabled).then(() => {
-        sendYouTubeUpdate({ type: 'set_all', enabled: message.enabled });
-        sendResponse({ success: true });
-      });
-      return true;
-
-    default:
-      break;
-  }
-});
-
-async function setChannelEnabled(channelId, enabled) {
-  const result = await chrome.storage.local.get(STORAGE_KEY);
-  let stored = result[STORAGE_KEY] || [];
-  stored = stored.map(ch => ch.id === channelId ? { ...ch, enabled } : ch);
-  await chrome.storage.local.set({ [STORAGE_KEY]: stored });
-}
-
-async function setAllChannelsEnabled(enabled) {
-  const result = await chrome.storage.local.get(STORAGE_KEY);
-  let stored = result[STORAGE_KEY] || [];
-  stored = stored.map(ch => ({ ...ch, enabled }));
-  await chrome.storage.local.set({ [STORAGE_KEY]: stored });
-}
-
-// Initialize on install
-chrome.runtime.onInstalled.addListener(() => {
-  initStorage();
-});
-
-initStorage();

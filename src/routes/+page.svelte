@@ -1,163 +1,60 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { channels, loadChannels, toggleChannel, setAllEnabled } from '$lib/stores/channels';
+  import Check from '@o7/icon/lucide/Check';
+  import X from '@o7/icon/lucide/X';
 
   onMount(() => {
     loadChannels();
   });
 </script>
 
-<div class="container">
-  <h1 class="container__header">Select Channels to Hide:</h1>
+<div class="block min-w-[440px] min-h-[395px] overflow-hidden bg-white p-2.5">
+  <h1 class="block text-[22px] text-black mb-2.5 text-left">Select Channels to Hide:</h1>
 
-  <ul id="list" class="list">
+  <ul id="list" class="flex flex-wrap max-h-[300px] overflow-y-scroll w-full border border-[#bbb] bg-[#fdfdfd] p-2 list-none m-0">
     {#each $channels as channel (channel.id)}
-      <li class="list-item">
+      <li class="inline-block cursor-pointer relative align-top mr-1 mb-1 w-[75px] min-h-[60px] select-none last:mr-0">
         <input
           type="checkbox"
-          class="list-item__checkbox"
+          class="peer absolute invisible"
           id={channel.id}
           bind:checked={channel.enabled}
           onchange={() => toggleChannel(channel.id, channel.enabled)}
         />
-        <label class="list-item__block" for={channel.id}>
-          <img class="list-item__icon" src={channel.icon} alt={channel.name} />
-          <span class="list-item__text">{channel.name}</span>
+        <label
+          class="flex flex-col justify-center content-center relative h-full w-full p-2 border border-transparent rounded-[6px] cursor-pointer
+                 peer-checked:border-[#22bef0] peer-checked:bg-[#ECF6FF]"
+          for={channel.id}
+        >
+          <div class="relative w-[34px] h-[34px] mx-auto">
+            <img class="block h-[34px] w-[34px] object-cover rounded-full" src={channel.icon} alt={channel.name} />
+            {#if channel.enabled}
+              <div class="absolute -bottom-0.5 -right-0.5 bg-[#22bef0] text-white rounded-full w-4 h-4 flex items-center justify-center">
+                <Check size={12} />
+              </div>
+            {/if}
+          </div>
+          <span class="block text-[10px] text-center mt-1 text-black break-words">{channel.name}</span>
         </label>
       </li>
     {/each}
   </ul>
 
-  <div class="controls">
+  <div class="flex gap-2 border border-[#bbb] border-t-0 px-2.5 py-1.5">
     <button
-      class="controls__btn btn"
+      class="inline-flex items-center gap-1 text-black border border-[#aaa] px-1.5 py-1 rounded-[4px] bg-[#eee] shadow-[inset_0_-1px_0_0_#999] cursor-pointer text-[12px] active:shadow-[inset_0_1px_4px_0_#aaa] active:bg-[#e4e4e4]"
       onclick={() => setAllEnabled(true)}
-    >Select All</button>
+    >
+      <Check size={14} />
+      Select All
+    </button>
     <button
-      class="controls__btn btn"
+      class="inline-flex items-center gap-1 text-black border border-[#aaa] px-1.5 py-1 rounded-[4px] bg-[#eee] shadow-[inset_0_-1px_0_0_#999] cursor-pointer text-[12px] active:shadow-[inset_0_1px_4px_0_#aaa] active:bg-[#e4e4e4]"
       onclick={() => setAllEnabled(false)}
-    >Deselect All</button>
+    >
+      <X size={14} />
+      Deselect All
+    </button>
   </div>
 </div>
-
-<style>
-  .container {
-    display: block;
-    min-width: 440px;
-    min-height: 395px;
-    overflow: hidden;
-    background-color: #fff;
-    padding: 10px;
-  }
-
-  .container__header {
-    display: block;
-    font-size: 22px;
-    color: #000;
-    margin-bottom: 10px;
-    text-align: left;
-  }
-
-  .list {
-    display: flex;
-    flex-wrap: wrap;
-    max-height: 300px;
-    overflow: hidden;
-    overflow-y: scroll;
-    width: 100%;
-    border: 1px solid #bbb;
-    background-color: #fdfdfd;
-    padding: 8px;
-    list-style: none;
-    margin: 0;
-  }
-
-  .list-item {
-    display: inline-block;
-    cursor: pointer;
-    position: relative;
-    vertical-align: top;
-    margin: 0 4px 4px 0;
-    width: 75px;
-    min-height: 60px;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-  }
-
-  .list-item:nth-of-type(5) {
-    margin-right: 0;
-  }
-
-  .list-item__checkbox {
-    display: block;
-    position: absolute;
-    visibility: hidden;
-  }
-
-  .list-item__block {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-content: center;
-    position: relative;
-    height: 100%;
-    width: 100%;
-    padding: 8px;
-    border: 1px solid transparent;
-    border-radius: 6px;
-  }
-
-  .list-item__checkbox:checked + .list-item__block {
-    border-color: #22bef0;
-    background-color: #ECF6FF;
-  }
-
-  .list-item__icon {
-    display: block;
-    height: 34px;
-    width: 34px;
-    margin: 0 auto;
-    -o-object-fit: cover;
-    object-fit: cover;
-    border-radius: 17px;
-  }
-
-  .list-item__text {
-    display: block;
-    font-size: 10px;
-    text-align: center;
-    margin-top: 5px;
-    color: #000;
-    word-wrap: break-word;
-  }
-
-  .controls {
-    display: block;
-    border: 1px solid #bbb;
-    border-top: none;
-    padding: 6px 10px;
-  }
-
-  .controls__btn {
-    display: inline-block;
-    margin-right: 10px;
-  }
-
-  .btn {
-    color: #000;
-    border: 1px solid #aaa;
-    padding: 4px 6px;
-    border-radius: 4px;
-    background-color: #eee;
-    box-shadow: inset 0 -1px 0 0 #999;
-    cursor: pointer;
-    font-size: 12px;
-  }
-
-  .btn:active {
-    box-shadow: inset 0 1px 4px 0 #aaa;
-    background-color: #e4e4e4;
-  }
-</style>
