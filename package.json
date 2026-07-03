@@ -42,5 +42,9 @@
 		"vite": "^6.3.5",
 		"vitest": "^3.2.4"
 	},
-	"type": "module"
+	"type": "module",
+	"dependencies": {
+		"@o7/icon": "^0.3.93",
+		"zod": "^4.4.3"
+	}
 }

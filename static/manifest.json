@@ -1,14 +1,46 @@
 {
-	"name": "sveltekit-extension-template",
-	"description": "Example Chrome extension built with Sveltekit and Skeleton",
-	"version": "0.0.1",
-	"manifest_version": 3,
-	"icons": {
-		"32": "favicon.png"
-	},
-	"action": {
-		"default_popup": "index.html",
-		"default_icon": "favicon.png",
-		"default_title": "sveltekit-extension-template"
-	}
+  "name": "De-Mainstream YouTube™",
+  "short_name": "De-Mainstream",
+  "description": "Fixes the YouTube™ algorithm to remove mainstream media results from searches.",
+  "version": "1.0.3",
+  "version_name": "1.0.3",
+  "manifest_version": 3,
+  "homepage_url": "https://www.demainstream.com",
+  "icons": {
+    "16": "img/icons/icon@1x.png",
+    "32": "img/icons/icon@2x.png",
+    "48": "img/icons/icon@3x.png",
+    "128": "img/icons/icon@8x.png"
+  },
+  "action": {
+    "default_title": "De-Mainstream",
+    "default_popup": "index.html",
+    "default_icon": {
+      "16": "img/icons/icon@1x.png",
+      "32": "img/icons/icon@2x.png",
+      "48": "img/icons/icon@3x.png",
+      "128": "img/icons/icon@8x.png"
+    }
+  },
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://*.youtube.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.youtube.com/*"
+      ],
+      "js": [
+        "youtube.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  }
 }
