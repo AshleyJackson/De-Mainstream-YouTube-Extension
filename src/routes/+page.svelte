@@ -1,11 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { channels, loadChannels, toggleChannel, setAllEnabled } from '$lib/stores/channels';
+  import { groups, loadGroups, toggleGroup, setAllEnabled } from '$lib/stores/channels';
   import Check from '@o7/icon/lucide/Check';
   import X from '@o7/icon/lucide/X';
 
   onMount(() => {
-    loadChannels();
+    loadGroups();
   });
 </script>
 
@@ -13,29 +13,32 @@
   <h1 class="block text-[22px] text-black mb-2.5 text-left">Select Channels to Hide:</h1>
 
   <ul id="list" class="flex flex-wrap max-h-[300px] overflow-y-scroll w-full border border-[#bbb] bg-[#fdfdfd] p-2 list-none m-0">
-    {#each $channels as channel (channel.id)}
+    {#each $groups as group (group.id)}
       <li class="inline-block cursor-pointer relative align-top mr-1 mb-1 w-[75px] min-h-[60px] select-none last:mr-0">
         <input
           type="checkbox"
           class="peer absolute invisible"
-          id={channel.id}
-          bind:checked={channel.enabled}
-          onchange={() => toggleChannel(channel.id, channel.enabled)}
+          id={group.id}
+          bind:checked={group.enabled}
+          onchange={() => toggleGroup(group.id, group.enabled)}
         />
         <label
           class="flex flex-col justify-center content-center relative h-full w-full p-2 border border-transparent rounded-[6px] cursor-pointer
                  peer-checked:border-[#22bef0] peer-checked:bg-[#ECF6FF]"
-          for={channel.id}
+          for={group.id}
         >
           <div class="relative w-[34px] h-[34px] mx-auto">
-            <img class="block h-[34px] w-[34px] object-cover rounded-full" src={channel.icon} alt={channel.name} />
-            {#if channel.enabled}
+            <img class="block h-[34px] w-[34px] object-cover rounded-full" src={group.icon} alt={group.name} />
+            {#if group.enabled}
               <div class="absolute -bottom-0.5 -right-0.5 bg-[#22bef0] text-white rounded-full w-4 h-4 flex items-center justify-center">
                 <Check size={12} />
               </div>
             {/if}
           </div>
-          <span class="block text-[10px] text-center mt-1 text-black break-words">{channel.name}</span>
+          <span class="block text-[10px] text-center mt-1 text-black break-words">{group.name}</span>
+          {#if group.channelIds.length > 1}
+            <span class="block text-[8px] text-center text-gray-400">{group.channelIds.length} channels</span>
+          {/if}
         </label>
       </li>
     {/each}

@@ -1,34 +1,36 @@
 // Content script — runs on YouTube pages to remove mainstream-media results
 
+interface ChannelGroup {
+  id: string;
+  name: string;
+  icon: string;
+  channelIds: string[];
+  enabled: boolean;
+}
+
 (function () {
   const searchForm = document.querySelector<HTMLFormElement>('#search-form');
   const searchFormInput = searchForm?.querySelector<HTMLInputElement>('#search');
 
-  let channels: { id: string; name: string; icon: string; enabled: boolean }[] = [];
-  let channelIds: string[] = [];
-  let channelNames: string[] = [];
+  let blockedChannelIds: string[] = [];
   let addedDailyTopLink = false;
   let observingTargetNode = false;
 
-  function getChannels(callback?: () => void): void {
+  function getGroups(callback?: () => void): void {
     chrome.runtime.sendMessage({ action: 'get_all' }, (values: unknown) => {
       if (!Array.isArray(values)) return;
-      channels = values;
-      channelNames = [];
-      channelIds = [];
 
-      channels
-        .filter((b) => b.enabled)
-        .forEach((b) => {
-          channelNames.push(b.name.toLowerCase());
-          channelIds.push(b.id.toLowerCase());
-        });
+      const groups = values as ChannelGroup[];
+      blockedChannelIds = groups
+        .filter((g) => g.enabled)
+        .flatMap((g) => g.channelIds)
+        .map((id) => id.toLowerCase());
 
       callback?.();
     });
   }
 
-  getChannels();
+  getGroups();
 
   searchForm?.addEventListener('submit', () => waitForVideoResults(), false);
 
@@ -40,7 +42,7 @@
   );
 
   chrome.runtime.onMessage.addListener(() => {
-    getChannels(() => waitForVideoResults());
+    getGroups(() => waitForVideoResults());
     return true;
   });
 
@@ -90,7 +92,6 @@
       fontWeight: isActive ? '500' : '',
     });
 
-    // simple inline SVG (trending-up icon)
     text.insertAdjacentHTML(
       'beforebegin',
       `<svg style="display:inline-block;height:20px;width:20px;vertical-align:middle;margin:0 24px 0 0" viewBox="0 0 24 24" fill="none" stroke="${isActive ? '#fc0d1b' : '#909090'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>`,
@@ -102,7 +103,7 @@
     return true;
   }
 
-  // ── Block videos from selected channels ───────────────────────
+  // ── Block videos from enabled groups' channelIds ─────────────
 
   function waitForVideoResults(): void {
     const links = document.querySelectorAll<HTMLAnchorElement>(
@@ -115,7 +116,7 @@
         .replace('/channel/', '')
         .toLowerCase();
 
-      if (channelIds.indexOf(found) > -1 || channelNames.indexOf(found) > -1) {
+      if (blockedChannelIds.indexOf(found) > -1) {
         const parent = el.closest('ytd-video-renderer, ytd-compact-video-renderer');
         parent?.remove();
       }
@@ -124,10 +125,7 @@
 
   // ── DOM observer ──────────────────────────────────────────────
 
-  function observeDOM(
-    obj: HTMLElement,
-    callback: () => void,
-  ): void {
+  function observeDOM(obj: HTMLElement, callback: () => void): void {
     const MutationObserver =
       window.MutationObserver || (window as any).WebKitMutationObserver;
 
@@ -162,6 +160,5 @@
     waitForVideoResults();
   }, 100);
 
-  // Safety timeout
   setTimeout(() => clearInterval(interval), 10_000);
 })();

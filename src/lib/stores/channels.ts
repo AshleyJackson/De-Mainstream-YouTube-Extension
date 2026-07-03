@@ -1,25 +1,25 @@
 import { writable } from 'svelte/store';
-import { ChannelArraySchema, type Channel } from '$lib/types';
+import { ChannelGroupArraySchema, type ChannelGroup } from '$lib/types';
 
-export const channels = writable<Channel[]>([]);
+export const groups = writable<ChannelGroup[]>([]);
 
-export async function loadChannels(): Promise<void> {
+export async function loadGroups(): Promise<void> {
   try {
     const values = await new Promise<unknown>((resolve) => {
       chrome.runtime.sendMessage({ action: 'get_all' }, (result: unknown) => {
         resolve(result);
       });
     });
-    const parsed = ChannelArraySchema.parse(values);
-    channels.set(parsed);
+    const parsed = ChannelGroupArraySchema.parse(values);
+    groups.set(parsed);
   } catch {
-    channels.set([]);
+    groups.set([]);
   }
 }
 
-export async function toggleChannel(id: string, enabled: boolean): Promise<void> {
+export async function toggleGroup(id: string, enabled: boolean): Promise<void> {
   try {
-    chrome.runtime.sendMessage({ action: 'set', channelId: id, enabled });
+    chrome.runtime.sendMessage({ action: 'set', groupId: id, enabled });
   } catch {
     // gracefully handled outside extension context
   }
@@ -28,7 +28,7 @@ export async function toggleChannel(id: string, enabled: boolean): Promise<void>
 export async function setAllEnabled(enabled: boolean): Promise<void> {
   try {
     chrome.runtime.sendMessage({ action: 'set_all', enabled });
-    channels.update(list => list.map(ch => ({ ...ch, enabled })));
+    groups.update(list => list.map(g => ({ ...g, enabled })));
   } catch {
     // gracefully handled outside extension context
   }

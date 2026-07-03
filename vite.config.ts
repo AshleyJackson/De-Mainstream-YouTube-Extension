@@ -12,7 +12,6 @@ function extensionBuildPlugin() {
 			const srcDir = path.resolve('src/extension');
 			if (!fs.existsSync(srcDir)) return;
 
-			// Use esbuild to compile extension TypeScript files
 			const { build } = await import('esbuild');
 			const files = fs.readdirSync(srcDir).filter(f => f.endsWith('.ts') && f !== 'types.ts' && f !== 'channels.ts' && f !== 'index.ts');
 
@@ -42,6 +41,8 @@ export default defineConfig({
 		}
 	},
 	test: {
-		include: ['src/**/*.{test,spec}.{js,ts}']
+		include: ['tests/**/*.{test,spec}.{js,ts}'],
+		setupFiles: ['./vitest.setup.ts'],
+		testTimeout: 10_000,
 	}
 });

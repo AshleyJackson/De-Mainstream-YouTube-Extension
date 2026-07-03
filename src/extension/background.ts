@@ -1,12 +1,18 @@
 import { z } from 'zod';
 import { CHANNEL_DEFINITIONS } from './channels';
 
-// ── Zod schemas (minimal, tree-shakeable) ───────────────────
+// ── Zod schemas ─────────────────────────────────────────────
 
-const ChannelSchema = z.object({ id: z.string(), name: z.string(), icon: z.string(), enabled: z.boolean() });
-const ChannelArraySchema = z.array(ChannelSchema);
+const ChannelGroupSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  icon: z.string(),
+  channelIds: z.array(z.string().min(1)).min(1),
+  enabled: z.boolean(),
+});
+const ChannelGroupArraySchema = z.array(ChannelGroupSchema);
 
-const SetMsg = z.object({ action: z.literal('set'), channelId: z.string().min(1), enabled: z.boolean() });
+const SetMsg = z.object({ action: z.literal('set'), groupId: z.string().min(1), enabled: z.boolean() });
 const SetAllMsg = z.object({ action: z.literal('set_all'), enabled: z.boolean() });
 const GetAllMsg = z.object({ action: z.literal('get_all') });
 const ExtMsg = z.discriminatedUnion('action', [GetAllMsg, SetMsg, SetAllMsg]);
@@ -14,20 +20,18 @@ const ExtMsg = z.discriminatedUnion('action', [GetAllMsg, SetMsg, SetAllMsg]);
 // ── Storage ─────────────────────────────────────────────────
 
 const STORAGE_KEY = 'demainstream';
-// Reuse a single schema instance for parsing
-const channelArray = () => ChannelArraySchema;
 
 async function initStorage(): Promise<void> {
   const { [STORAGE_KEY]: raw } = await chrome.storage.local.get(STORAGE_KEY);
-  if (!channelArray().safeParse(raw).success) {
+  if (!ChannelGroupArraySchema.safeParse(raw).success) {
     const defaults = CHANNEL_DEFINITIONS.map((ch) => ({ ...ch, enabled: true }));
     await chrome.storage.local.set({ [STORAGE_KEY]: defaults });
   }
 }
 
-async function getChannels() {
+async function getGroups() {
   const { [STORAGE_KEY]: raw } = await chrome.storage.local.get(STORAGE_KEY);
-  return channelArray().parse(raw ?? []);
+  return ChannelGroupArraySchema.parse(raw ?? []);
 }
 
 async function sendYouTubeUpdate(data: unknown): Promise<void> {
@@ -37,15 +41,15 @@ async function sendYouTubeUpdate(data: unknown): Promise<void> {
   }
 }
 
-async function setChannelEnabled(channelId: string, enabled: boolean): Promise<void> {
-  const stored = await getChannels();
-  const updated = stored.map((ch) => (ch.id === channelId ? { ...ch, enabled } : ch));
+async function setGroupEnabled(groupId: string, enabled: boolean): Promise<void> {
+  const stored = await getGroups();
+  const updated = stored.map((g) => (g.id === groupId ? { ...g, enabled } : g));
   await chrome.storage.local.set({ [STORAGE_KEY]: updated });
 }
 
-async function setAllChannelsEnabled(enabled: boolean): Promise<void> {
-  const stored = await getChannels();
-  const updated = stored.map((ch) => ({ ...ch, enabled }));
+async function setAllGroupsEnabled(enabled: boolean): Promise<void> {
+  const stored = await getGroups();
+  const updated = stored.map((g) => ({ ...g, enabled }));
   await chrome.storage.local.set({ [STORAGE_KEY]: updated });
 }
 
@@ -57,18 +61,18 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
 
   switch (parsed.data.action) {
     case 'get_all':
-      getChannels().then(sendResponse);
+      getGroups().then(sendResponse);
       return true;
 
     case 'set':
-      setChannelEnabled(parsed.data.channelId, parsed.data.enabled).then(() => {
-        sendYouTubeUpdate({ type: 'set', channelId: parsed.data.channelId });
+      setGroupEnabled(parsed.data.groupId, parsed.data.enabled).then(() => {
+        sendYouTubeUpdate({ type: 'set', groupId: parsed.data.groupId });
         sendResponse({ success: true });
       });
       return true;
 
     case 'set_all':
-      setAllChannelsEnabled(parsed.data.enabled).then(() => {
+      setAllGroupsEnabled(parsed.data.enabled).then(() => {
         sendYouTubeUpdate({ type: 'set_all', enabled: parsed.data.enabled });
         sendResponse({ success: true });
       });
