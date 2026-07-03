@@ -29,7 +29,7 @@ function createChromeMock() {
 
 let mockChrome: ReturnType<typeof createChromeMock>;
 let onMessageListener: (message: unknown, sender: unknown, sendResponse: (response: unknown) => void) => boolean | undefined;
-let onInstalledListener: () => void;
+let onInstalledListener: (details: { reason: string; previousVersion?: string }) => void;
 
 beforeEach(() => {
   vi.resetModules();
@@ -40,7 +40,7 @@ beforeEach(() => {
     (fn: typeof onMessageListener) => { onMessageListener = fn; },
   );
   mockChrome.runtime.onInstalled.addListener.mockImplementation(
-    (fn: () => void) => { onInstalledListener = fn; },
+    (fn: typeof onInstalledListener) => { onInstalledListener = fn; },
   );
 });
 
@@ -52,13 +52,13 @@ describe('background service worker', () => {
     expect(mockChrome.runtime.onInstalled.addListener).toHaveBeenCalled();
   });
 
-  it('initializes storage on install with default groups (all enabled)', async () => {
+  it('seeds storage with defaults when no data exists', async () => {
     mockChrome.storage.local.get.mockResolvedValue({});
     mockChrome.storage.local.set.mockResolvedValue(undefined);
 
     await import('../../src/extension/background');
 
-    onInstalledListener();
+    onInstalledListener({ reason: 'install' });
     await new Promise(r => setTimeout(r, 50));
 
     expect(mockChrome.storage.local.set).toHaveBeenCalled();
@@ -70,6 +70,55 @@ describe('background service worker', () => {
       expect(g.enabled).toBe(true);
       expect(Array.isArray(g.channelIds)).toBe(true);
       expect(g.channelIds.length).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it('does not overwrite storage if data is already in group format', async () => {
+    const existing = [
+      { id: 'cnn', name: 'CNN', icon: 'img/channels/cnn.jpg', channelIds: ['CNN'], enabled: false },
+    ];
+    mockChrome.storage.local.get.mockResolvedValue({ [STORAGE_KEY]: existing });
+    mockChrome.storage.local.set.mockResolvedValue(undefined);
+
+    await import('../../src/extension/background');
+
+    onInstalledListener({ reason: 'install' });
+    await new Promise(r => setTimeout(r, 50));
+
+    // Should NOT have called set (data was already valid)
+    expect(mockChrome.storage.local.set).not.toHaveBeenCalled();
+  });
+
+  it('migrates legacy format (single channels) to group format', async () => {
+    const legacy = [
+      { id: 'CNN', name: 'CNN', icon: 'img/channels/cnn.jpg', enabled: true },
+      { id: 'BBC', name: 'BBC', icon: 'img/channels/bbc.jpg', enabled: false },
+      { id: 'bbcnews', name: 'BBC News', icon: 'img/channels/bbc-news.jpg', enabled: true },
+    ];
+    mockChrome.storage.local.get.mockResolvedValue({ [STORAGE_KEY]: legacy });
+    mockChrome.storage.local.set.mockResolvedValue(undefined);
+
+    await import('../../src/extension/background');
+
+    onInstalledListener({ reason: 'install' });
+    await new Promise(r => setTimeout(r, 50));
+
+    expect(mockChrome.storage.local.set).toHaveBeenCalled();
+    const call = mockChrome.storage.local.set.mock.calls.at(-1);
+    const stored = call[0][STORAGE_KEY];
+
+    // CNN group should be enabled (CNN was enabled)
+    const cnn = stored.find((g: { id: string }) => g.id === 'cnn');
+    expect(cnn.enabled).toBe(true);
+
+    // BBC group should be enabled only if ALL its channelIds were enabled
+    // BBC was disabled, bbcnews was enabled → not all enabled → group disabled
+    const bbc = stored.find((g: { id: string }) => g.id === 'bbc');
+    expect(bbc.enabled).toBe(false);
+
+    // All groups should have channelIds arrays
+    for (const g of stored) {
+      expect(Array.isArray(g.channelIds)).toBe(true);
     }
   });
 
@@ -91,6 +140,22 @@ describe('background service worker', () => {
       expect(response).toEqual([
         { id: 'cnn', name: 'CNN', icon: 'img/channels/cnn.jpg', channelIds: ['CNN'], enabled: true },
       ]);
+    });
+
+    it('returns defaults if stored data is invalid', async () => {
+      mockChrome.storage.local.get.mockResolvedValue({
+        [STORAGE_KEY]: [{ bad: 'data' }],
+      });
+
+      await import('../../src/extension/background');
+
+      const response = await new Promise<unknown>((resolve) => {
+        onMessageListener?.({ action: 'get_all' }, null, resolve);
+      });
+
+      const groups = response as { id: string; channelIds: string[] }[];
+      expect(groups.length).toBeGreaterThan(10);
+      expect(groups.every(g => Array.isArray(g.channelIds))).toBe(true);
     });
   });
 

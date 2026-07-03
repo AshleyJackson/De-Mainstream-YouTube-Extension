@@ -1,63 +1,60 @@
-# SvelteKit Chrome Extension Template
-By Luke Hagar
+# De-Mainstream YouTube Extension
 
+Fixes the YouTube algorithm to remove mainstream media results from searches.
 
-Built with [Sveltekit](https://kit.svelte.dev) and [Skeleton](https://www.skeleton.dev)
+## How it works
 
-Out of the box Includes:
-   * [x] Svelte 5
-   * [x] Skeleton 3
-   * [x] Tailwind 4
-   * [x] Chrome Types
-   * [x] ESlint
-   * [x] Prettier
-   * [x] TypeScript
-   * [x] Vite
-   * [x] Vitest
+The extension groups mainstream outlets by parent company. Each group contains one or more YouTube channel IDs — toggling a group hides **all** its channels at once. For example, toggling "CBS" hides CBS, CBS News, CBS Evening News, CBS This Morning, and Face the Nation.
 
+## Tech stack
 
+- [SvelteKit](https://kit.svelte.dev) + [Svelte 5](https://svelte.dev)
+- [Tailwind CSS v4](https://tailwindcss.com)
+- [`@o7/icon`](https://github.com/o7-dev/icon) (Lucide icons)
+- [Zod](https://zod.dev) (runtime validation)
+- [`sveltekit-adapter-chrome-extension`](https://github.com/nick-michael/sveltekit-adapter-chrome-extension) (MV3)
+- [Vitest](https://vitest.dev) + [jsdom](https://github.com/jsdom/jsdom)
 
+## Developing
 
-## Reference Documentation
+Install dependencies and start the dev server:
 
-
-[Extension Development Basics](https://developer.chrome.com/docs/extensions/mv3/getstarted/development-basics/)
-
-
-
-## Developing 
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-NPM:
 ```bash
-npm run dev
-```
-Yarn:
-```bash
-yarn dev
-```
-pnpm:
-```bash
-pnpm dev
+bun install
+bun run dev
 ```
 
 ## Building
 
-To create a production version of your app:
+Build the extension for production:
 
-NPM:
 ```bash
-npm run build
-```
-Yarn:
-```bash
-yarn build
-```
-pnpm:
-```bash
-pnpm build
+bun run build
 ```
 
+The output lands in `build/`. Load it as an unpacked Chrome extension via `chrome://extensions` → **Load unpacked** → select the `build/` directory. See [Extension Development Basics](https://developer.chrome.com/docs/extensions/mv3/getstarted/development-basics/).
 
-> To deploy your app, you can load it as an unpacked chrome extension, instructions are in [Extension Development Basics](https://developer.chrome.com/docs/extensions/mv3/getstarted/development-basics/)
+## Testing
+
+```bash
+bun run test:unit
+```
+
+58 tests across 5 files covering zod schemas, channel data integrity, Svelte stores, service worker message handling, and content script DOM filtering.
+
+## Project structure
+
+```
+src/
+├── extension/          # Service worker + content script (compiled via esbuild)
+├── lib/                # Shared types, data, stores ($lib alias)
+├── routes/             # SvelteKit popup UI
+tests/                  # Vitest test files
+static/                 # manifest.json, channel icons, extension icons
+```
+
+## Adding a channel group
+
+1. Add the group entry to both `src/extension/channels.ts` and `src/lib/data/channels.ts`
+2. Add a 34×34 JPG avatar to `static/img/channels/`
+3. Update `GROUP_COUNT` in `tests/lib/data/channels.test.ts`

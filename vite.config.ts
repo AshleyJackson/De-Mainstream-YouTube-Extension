@@ -29,6 +29,13 @@ function extensionBuildPlugin() {
 					external: ['chrome'],
 				});
 			}
+
+			// Ensure static/manifest.json is copied to build/ (Vite watch doesn't re-copy statics)
+			const srcManifest = path.resolve('static/manifest.json');
+			const dstManifest = path.join(outDir, 'manifest.json');
+			if (fs.existsSync(srcManifest)) {
+				fs.copyFileSync(srcManifest, dstManifest);
+			}
 		}
 	};
 }
