@@ -45,7 +45,6 @@ describe("CHANNEL_DEFINITIONS", () => {
   });
 
   it("has channelIds for both legacy and @handle formats", () => {
-    const allIds = CHANNEL_DEFINITIONS.flatMap((c) => c.channelIds);
     // Each group should have at least one @handle-style ID
     const handleStyleCount = CHANNEL_DEFINITIONS.filter((g) =>
       g.channelIds.some(
