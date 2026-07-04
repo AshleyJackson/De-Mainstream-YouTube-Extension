@@ -11,7 +11,8 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"test:unit": "vitest",
 		"lint": "prettier --plugin-search-dir . --check . && eslint .",
-		"format": "prettier --plugin-search-dir . --write ."
+		"format": "prettier --plugin-search-dir . --write .",
+		"package": "bun run build && cd build && zip -r ../extension.zip . -x '.*'"
 	},
 	"devDependencies": {
 		"@floating-ui/dom": "^1.7.1",
