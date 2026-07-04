@@ -272,7 +272,12 @@ interface ChannelGroup {
 
   function observeDOM(obj: HTMLElement, callback: () => void): void {
     const MutationObserver =
-      window.MutationObserver || (window as unknown as { WebKitMutationObserver?: typeof window.MutationObserver }).WebKitMutationObserver;
+      window.MutationObserver ||
+      (
+        window as unknown as {
+          WebKitMutationObserver?: typeof window.MutationObserver;
+        }
+      ).WebKitMutationObserver;
 
     if (MutationObserver) {
       const obs = new MutationObserver((mutations) => {
