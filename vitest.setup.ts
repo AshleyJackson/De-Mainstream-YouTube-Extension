@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi } from "vitest";
 
 // ── Chrome API mocks ────────────────────────────────────────
 
@@ -8,7 +8,7 @@ function createChromeStorage() {
   return {
     local: {
       get: vi.fn((keys: string | string[] | Record<string, unknown> | null) => {
-        if (typeof keys === 'string') {
+        if (typeof keys === "string") {
           return Promise.resolve({ [keys]: store[keys] ?? null });
         }
         if (Array.isArray(keys)) {
@@ -16,7 +16,7 @@ function createChromeStorage() {
           for (const k of keys) result[k] = store[k] ?? null;
           return Promise.resolve(result);
         }
-        if (keys && typeof keys === 'object') {
+        if (keys && typeof keys === "object") {
           const result: Record<string, unknown> = {};
           for (const k of Object.keys(keys)) {
             result[k] = store[k] ?? (keys as Record<string, unknown>)[k];
@@ -35,7 +35,7 @@ function createChromeStorage() {
         return Promise.resolve();
       }),
       clear: vi.fn(() => {
-        Object.keys(store).forEach(k => delete store[k]);
+        Object.keys(store).forEach((k) => delete store[k]);
         return Promise.resolve();
       }),
     },

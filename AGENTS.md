@@ -49,6 +49,7 @@ Example: the `cbs` group contains `CBS`, `CBSNewsOnline`, `CBSEveningNews`, `CBS
 ## Agent Instructions
 
 ### When adding a channel group
+
 1. Add to both `src/extension/channels.ts` AND `src/lib/data/channels.ts`
 2. Add a 34×34 JPG to `static/img/channels/`
 3. Update `GROUP_COUNT` in `tests/lib/data/channels.test.ts`
@@ -56,14 +57,17 @@ Example: the `cbs` group contains `CBS`, `CBSNewsOnline`, `CBSEveningNews`, `CBS
 5. Verify no duplicate `channelIds` across groups (there's a test for this)
 
 ### When adding a new YouTube channel ID to an existing group
+
 1. Add the ID string to the group's `channelIds` in both `channels.ts` files
 2. No new icon needed — the group icon is used
 
 ### When modifying schemas
+
 - All runtime-validated types live in `src/lib/types.ts` using zod
 - `src/extension/types.ts` has plain TS interfaces for esbuild-bundled code (avoids bundling zod into the service worker)
 
 ### Test conventions
+
 - Tests live in `tests/` directory
 - All chrome.* APIs are mocked via `vitest.setup.ts`
 - Content script tests use `environment: 'jsdom'`

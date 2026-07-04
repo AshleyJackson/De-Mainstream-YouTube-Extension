@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 // ── Channel group schema ────────────────────────────────────
 // A group represents a parent company/brand with one or more
@@ -16,20 +16,20 @@ export const ChannelGroupArraySchema = z.array(ChannelGroupSchema);
 
 // ── Runtime message schemas ─────────────────────────────────
 
-export const GetAllMessageSchema = z.object({ action: z.literal('get_all') });
+export const GetAllMessageSchema = z.object({ action: z.literal("get_all") });
 
 export const SetMessageSchema = z.object({
-  action: z.literal('set'),
+  action: z.literal("set"),
   groupId: z.string().min(1),
   enabled: z.boolean(),
 });
 
 export const SetAllMessageSchema = z.object({
-  action: z.literal('set_all'),
+  action: z.literal("set_all"),
   enabled: z.boolean(),
 });
 
-export const ExtensionMessageSchema = z.discriminatedUnion('action', [
+export const ExtensionMessageSchema = z.discriminatedUnion("action", [
   GetAllMessageSchema,
   SetMessageSchema,
   SetAllMessageSchema,
@@ -39,16 +39,16 @@ export type ExtensionMessage = z.infer<typeof ExtensionMessageSchema>;
 // ── Tab update payloads (sent to content script) ────────────
 
 export const SetAllUpdateSchema = z.object({
-  type: z.literal('set_all'),
+  type: z.literal("set_all"),
   enabled: z.boolean(),
 });
 
 export const SetUpdateSchema = z.object({
-  type: z.literal('set'),
+  type: z.literal("set"),
   groupId: z.string().min(1),
 });
 
-export const TabUpdateSchema = z.discriminatedUnion('type', [
+export const TabUpdateSchema = z.discriminatedUnion("type", [
   SetAllUpdateSchema,
   SetUpdateSchema,
 ]);

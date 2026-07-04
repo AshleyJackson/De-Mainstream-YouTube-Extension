@@ -1,55 +1,63 @@
-import tailwindcss from '@tailwindcss/vite';
-import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vitest/config';
-import * as path from 'path';
-import * as fs from 'fs';
+import tailwindcss from "@tailwindcss/vite";
+import { sveltekit } from "@sveltejs/kit/vite";
+import { defineConfig } from "vitest/config";
+import * as path from "path";
+import * as fs from "fs";
 
 function extensionBuildPlugin() {
-	return {
-		name: 'extension-build',
-		async closeBundle() {
-			const outDir = path.resolve('build');
-			const srcDir = path.resolve('src/extension');
-			if (!fs.existsSync(srcDir)) return;
+  return {
+    name: "extension-build",
+    async closeBundle() {
+      const outDir = path.resolve("build");
+      const srcDir = path.resolve("src/extension");
+      if (!fs.existsSync(srcDir)) return;
 
-			const { build } = await import('esbuild');
-			const files = fs.readdirSync(srcDir).filter(f => f.endsWith('.ts') && f !== 'types.ts' && f !== 'channels.ts' && f !== 'index.ts');
+      const { build } = await import("esbuild");
+      const files = fs
+        .readdirSync(srcDir)
+        .filter(
+          (f) =>
+            f.endsWith(".ts") &&
+            f !== "types.ts" &&
+            f !== "channels.ts" &&
+            f !== "index.ts",
+        );
 
-			for (const file of files) {
-				const entry = path.join(srcDir, file);
-				const outfile = path.join(outDir, file.replace('.ts', '.js'));
-				await build({
-					entryPoints: [entry],
-					outfile,
-					bundle: true,
-					format: 'esm',
-					platform: 'browser',
-					target: 'es2022',
-					minify: false,
-					external: ['chrome'],
-				});
-			}
+      for (const file of files) {
+        const entry = path.join(srcDir, file);
+        const outfile = path.join(outDir, file.replace(".ts", ".js"));
+        await build({
+          entryPoints: [entry],
+          outfile,
+          bundle: true,
+          format: "esm",
+          platform: "browser",
+          target: "es2022",
+          minify: false,
+          external: ["chrome"],
+        });
+      }
 
-			// Ensure static/manifest.json is copied to build/ (Vite watch doesn't re-copy statics)
-			const srcManifest = path.resolve('static/manifest.json');
-			const dstManifest = path.join(outDir, 'manifest.json');
-			if (fs.existsSync(srcManifest)) {
-				fs.copyFileSync(srcManifest, dstManifest);
-			}
-		}
-	};
+      // Ensure static/manifest.json is copied to build/ (Vite watch doesn't re-copy statics)
+      const srcManifest = path.resolve("static/manifest.json");
+      const dstManifest = path.join(outDir, "manifest.json");
+      if (fs.existsSync(srcManifest)) {
+        fs.copyFileSync(srcManifest, dstManifest);
+      }
+    },
+  };
 }
 
 export default defineConfig({
-	plugins: [tailwindcss(), sveltekit(), extensionBuildPlugin()],
-	build: {
-		rollupOptions: {
-			external: []
-		}
-	},
-	test: {
-		include: ['tests/**/*.{test,spec}.{js,ts}'],
-		setupFiles: ['./vitest.setup.ts'],
-		testTimeout: 10_000,
-	}
+  plugins: [tailwindcss(), sveltekit(), extensionBuildPlugin()],
+  build: {
+    rollupOptions: {
+      external: [],
+    },
+  },
+  test: {
+    include: ["tests/**/*.{test,spec}.{js,ts}"],
+    setupFiles: ["./vitest.setup.ts"],
+    testTimeout: 10_000,
+  },
 });
