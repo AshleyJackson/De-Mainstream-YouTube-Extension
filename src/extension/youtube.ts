@@ -285,10 +285,6 @@ interface ChannelGroup {
       });
       obs.observe(obj, { childList: true, subtree: true });
       log.debug("MutationObserver attached", { target: obj.id || obj.tagName });
-    } else if (window.addEventListener) {
-      obj.addEventListener("DOMNodeInserted", callback as EventListener, false);
-      obj.addEventListener("DOMNodeRemoved", callback as EventListener, false);
-      log.debug("Fallback DOM event listeners attached");
     }
   }
 

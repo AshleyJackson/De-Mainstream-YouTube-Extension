@@ -184,24 +184,30 @@ chrome.runtime.onMessage.addListener(
         });
         return true;
 
-      case "set":
-        setGroupEnabled(parsed.data.groupId, parsed.data.enabled).then(() => {
-          sendYouTubeUpdate({ type: "set", groupId: parsed.data.groupId });
+      case "set": {
+        const msg = parsed.data;
+        setGroupEnabled(msg.groupId, msg.enabled).then(() => {
+          sendYouTubeUpdate({ type: "set", groupId: msg.groupId });
           sendResponse({ success: true });
         });
         return true;
+      }
 
-      case "set_all":
-        setAllGroupsEnabled(parsed.data.enabled).then(() => {
-          sendYouTubeUpdate({ type: "set_all", enabled: parsed.data.enabled });
+      case "set_all": {
+        const msg = parsed.data;
+        setAllGroupsEnabled(msg.enabled).then(() => {
+          sendYouTubeUpdate({ type: "set_all", enabled: msg.enabled });
           sendResponse({ success: true });
         });
         return true;
+      }
 
-      case "badge_count":
-        updateBadge(parsed.data.count);
+      case "badge_count": {
+        const msg = parsed.data;
+        updateBadge(msg.count);
         sendResponse({ success: true });
         return false;
+      }
     }
   },
 );

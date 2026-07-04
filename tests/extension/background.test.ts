@@ -2,12 +2,27 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const STORAGE_KEY = "demainstream";
 
+type StoredGroup = {
+  id: string;
+  name: string;
+  icon: string;
+  channelIds: string[];
+  enabled: boolean;
+};
+
+function getLastSetCall(): Record<string, StoredGroup[]> {
+  const calls = mockChrome.storage.local.set.mock.calls as unknown as Array<
+    [Record<string, StoredGroup[]>]
+  >;
+  return calls[calls.length - 1][0];
+}
+
 function createChromeMock() {
   return {
     storage: {
       local: {
-        get: vi.fn(() => Promise.resolve({})),
-        set: vi.fn(() => Promise.resolve()),
+        get: vi.fn<() => Promise<unknown>>(() => Promise.resolve({})),
+        set: vi.fn<() => Promise<void>>(() => Promise.resolve()),
       },
     },
     runtime: {
@@ -21,8 +36,8 @@ function createChromeMock() {
       },
     },
     tabs: {
-      query: vi.fn(() => Promise.resolve([])),
-      sendMessage: vi.fn(() => Promise.resolve()),
+      query: vi.fn<() => Promise<chrome.tabs.Tab[]>>(() => Promise.resolve([])),
+      sendMessage: vi.fn<() => Promise<void>>(() => Promise.resolve()),
     },
     action: {
       setBadgeText: vi.fn(),
@@ -77,8 +92,7 @@ describe("background service worker", () => {
     await new Promise((r) => setTimeout(r, 50));
 
     expect(mockChrome.storage.local.set).toHaveBeenCalled();
-    const call = mockChrome.storage.local.set.mock.calls.at(-1);
-    const stored = call[0][STORAGE_KEY];
+    const stored = getLastSetCall()[STORAGE_KEY];
     expect(Array.isArray(stored)).toBe(true);
     expect(stored.length).toBeGreaterThan(10);
     for (const g of stored) {
@@ -130,17 +144,16 @@ describe("background service worker", () => {
     await new Promise((r) => setTimeout(r, 50));
 
     expect(mockChrome.storage.local.set).toHaveBeenCalled();
-    const call = mockChrome.storage.local.set.mock.calls.at(-1);
-    const stored = call[0][STORAGE_KEY];
+    const stored = getLastSetCall()[STORAGE_KEY];
 
     // CNN group should be enabled (CNN was enabled)
     const cnn = stored.find((g: { id: string }) => g.id === "cnn");
-    expect(cnn.enabled).toBe(true);
+    expect(cnn!.enabled).toBe(true);
 
     // BBC group should be enabled if ANY of its channelIds were enabled in legacy
     // BBC was disabled, bbcnews was enabled → at least one enabled → group enabled
     const bbc = stored.find((g: { id: string }) => g.id === "bbc");
-    expect(bbc.enabled).toBe(true);
+    expect(bbc!.enabled).toBe(true);
 
     // All groups should have channelIds arrays
     for (const g of stored) {
@@ -240,10 +253,10 @@ describe("background service worker", () => {
 
       expect(response).toEqual({ success: true });
 
-      const setCall = mockChrome.storage.local.set.mock.calls.at(-1);
-      const updated = setCall[0][STORAGE_KEY];
+      const setCall = getLastSetCall();
+      const updated = setCall[STORAGE_KEY];
       const bbc = updated.find((g: { id: string }) => g.id === "bbc");
-      expect(bbc.enabled).toBe(true);
+      expect(bbc!.enabled).toBe(true);
 
       expect(mockChrome.tabs.sendMessage).toHaveBeenCalledWith(1, {
         type: "set",
@@ -291,8 +304,8 @@ describe("background service worker", () => {
 
       expect(response).toEqual({ success: true });
 
-      const setCall = mockChrome.storage.local.set.mock.calls.at(-1);
-      const updated = setCall[0][STORAGE_KEY];
+      const setCall = getLastSetCall();
+      const updated = setCall[STORAGE_KEY];
       expect(
         updated.every((g: { enabled: boolean }) => g.enabled === false),
       ).toBe(true);
