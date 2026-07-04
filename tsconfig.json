@@ -10,7 +10,8 @@
 		"sourceMap": true,
 		"strict": true,
 		"types": [
-			"chrome"
+			"chrome",
+			"node"
 		],
 		"moduleResolution": "bundler"
 	}

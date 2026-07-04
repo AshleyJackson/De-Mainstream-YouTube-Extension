@@ -26,6 +26,7 @@
 		"@tailwindcss/typography": "^0.5.15",
 		"@tailwindcss/vite": "^4.0.0",
 		"@types/chrome": "^0.2.2",
+		"@types/node": "^26.1.0",
 		"@typescript-eslint/eslint-plugin": "^8.35.0",
 		"@typescript-eslint/parser": "^8.35.0",
 		"autoprefixer": "^10.4.21",
