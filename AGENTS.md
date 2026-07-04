@@ -68,6 +68,7 @@ Example: the `cbs` group contains `CBS`, `CBSNewsOnline`, `CBSEveningNews`, `CBS
 - All chrome.* APIs are mocked via `vitest.setup.ts`
 - Content script tests use `environment: 'jsdom'`
 - Run `bun run test:unit` (vitest)
+- **Mandatory:** Every function that is created, reviewed, or updated must have corresponding tests. No function changes land without test coverage.
 
 ## State flow
 

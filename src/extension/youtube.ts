@@ -18,6 +18,7 @@ interface ChannelGroup {
   let blockedDisplayNames: string[] = [];
   let addedDailyTopLink = false;
   let observingTargetNode = false;
+  let totalRemovedCount = 0;
 
   log.info('Content script injected', { url: window.location.href });
 
@@ -49,6 +50,8 @@ interface ChannelGroup {
 
   getGroups(() => {
     log.info('Initial groups loaded, filtering');
+    // Clear badge on fresh page load (totalRemovedCount starts at 0)
+    chrome.runtime.sendMessage({ action: 'badge_count', count: 0 });
     waitForVideoResults();
   });
 
@@ -223,7 +226,9 @@ interface ChannelGroup {
 
     if (removedCount > 0) {
       log.info('Removed mainstream videos', { count: removedCount });
+      totalRemovedCount += removedCount;
     }
+    chrome.runtime.sendMessage({ action: 'badge_count', count: totalRemovedCount });
   }
 
   // ── DOM observer ──────────────────────────────────────────────
@@ -263,8 +268,15 @@ interface ChannelGroup {
       }
     }
 
-    // Run filter each tick — safe no-op until getGroups populates the arrays
-    waitForVideoResults();
+    // On home page (no search results), clear the badge
+    const isHome = window.location.pathname === '/' || window.location.pathname === '';
+    if (isHome) {
+      totalRemovedCount = 0;
+      chrome.runtime.sendMessage({ action: 'badge_count', count: 0 });
+    } else {
+      // Run filter each tick — safe no-op until getGroups populates the arrays
+      waitForVideoResults();
+    }
 
     // Only stop polling once we've confirmed a non-empty blocked list
     // AND found the sidebar + ytd-app content elements

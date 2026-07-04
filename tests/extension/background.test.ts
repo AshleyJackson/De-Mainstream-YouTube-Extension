@@ -24,6 +24,10 @@ function createChromeMock() {
       query: vi.fn(() => Promise.resolve([])),
       sendMessage: vi.fn(() => Promise.resolve()),
     },
+    action: {
+      setBadgeText: vi.fn(),
+      setBadgeBackgroundColor: vi.fn(),
+    },
   };
 }
 
@@ -223,6 +227,32 @@ describe('background service worker', () => {
       expect(updated.every((g: { enabled: boolean }) => g.enabled === false)).toBe(true);
 
       expect(mockChrome.tabs.sendMessage).toHaveBeenCalledWith(1, { type: 'set_all', enabled: false });
+    });
+  });
+
+  describe('badge_count handler', () => {
+    it('updates badge text and background color', async () => {
+      await import('../../src/extension/background');
+
+      const response = await new Promise<unknown>((resolve) => {
+        onMessageListener?.({ action: 'badge_count', count: 12 }, null, resolve);
+      });
+
+      expect(response).toEqual({ success: true });
+      expect(mockChrome.action.setBadgeText).toHaveBeenCalledWith({ text: '12' });
+      expect(mockChrome.action.setBadgeBackgroundColor).toHaveBeenCalledWith({ color: '#e74c3c' });
+    });
+
+    it('clears badge when count is zero', async () => {
+      await import('../../src/extension/background');
+
+      const response = await new Promise<unknown>((resolve) => {
+        onMessageListener?.({ action: 'badge_count', count: 0 }, null, resolve);
+      });
+
+      expect(response).toEqual({ success: true });
+      expect(mockChrome.action.setBadgeText).toHaveBeenCalledWith({ text: '' });
+      expect(mockChrome.action.setBadgeBackgroundColor).not.toHaveBeenCalled();
     });
   });
 

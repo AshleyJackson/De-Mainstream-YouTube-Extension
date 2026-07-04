@@ -24,7 +24,8 @@ const LegacyChannelArraySchema = z.array(LegacyChannelSchema);
 const SetMsg = z.object({ action: z.literal('set'), groupId: z.string().min(1), enabled: z.boolean() });
 const SetAllMsg = z.object({ action: z.literal('set_all'), enabled: z.boolean() });
 const GetAllMsg = z.object({ action: z.literal('get_all') });
-const ExtMsg = z.discriminatedUnion('action', [GetAllMsg, SetMsg, SetAllMsg]);
+const BadgeCountMsg = z.object({ action: z.literal('badge_count'), count: z.number() });
+const ExtMsg = z.discriminatedUnion('action', [GetAllMsg, SetMsg, SetAllMsg, BadgeCountMsg]);
 
 // ── Storage ─────────────────────────────────────────────────
 
@@ -99,6 +100,15 @@ async function sendYouTubeUpdate(data: unknown): Promise<void> {
   }
 }
 
+function updateBadge(count: number): void {
+  const text = count > 0 ? String(count) : '';
+  chrome.action.setBadgeText({ text });
+  if (count > 0) {
+    chrome.action.setBadgeBackgroundColor({ color: '#e74c3c' });
+  }
+  log.debug('Badge updated', { count });
+}
+
 async function setGroupEnabled(groupId: string, enabled: boolean): Promise<void> {
   log.info('Setting group enabled', { groupId, enabled });
   const stored = await getGroups();
@@ -152,6 +162,11 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
         sendResponse({ success: true });
       });
       return true;
+
+    case 'badge_count':
+      updateBadge(parsed.data.count);
+      sendResponse({ success: true });
+      return false;
   }
 });
 
