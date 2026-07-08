@@ -53,6 +53,12 @@ function createChromeStorage() {
       query: vi.fn(() => Promise.resolve([])),
       sendMessage: vi.fn(() => Promise.resolve()),
     },
+    contextMenus: {
+      create: vi.fn(() => Promise.resolve()),
+      onClicked: {
+        addListener: vi.fn(),
+      },
+    },
   } as unknown as typeof chrome;
 }
 

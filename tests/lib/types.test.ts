@@ -2,12 +2,17 @@ import { describe, it, expect } from "vitest";
 import {
   ChannelGroupSchema,
   ChannelGroupArraySchema,
+  CustomChannelsSchema,
   GetAllMessageSchema,
   SetMessageSchema,
   SetAllMessageSchema,
+  AddCustomMessageSchema,
+  RemoveCustomMessageSchema,
+  GetCustomMessageSchema,
   ExtensionMessageSchema,
   SetUpdateSchema,
   SetAllUpdateSchema,
+  RefreshUpdateSchema,
   TabUpdateSchema,
 } from "$lib/types";
 
@@ -209,6 +214,73 @@ describe("Extension messages", () => {
     });
   });
 
+  describe("CustomChannelsSchema", () => {
+    it("validates a list of channel IDs", () => {
+      expect(
+        CustomChannelsSchema.safeParse(["UC123", "BBCNews", "@handle"]).success,
+      ).toBe(true);
+    });
+
+    it("validates an empty list", () => {
+      expect(CustomChannelsSchema.safeParse([]).success).toBe(true);
+    });
+
+    it("rejects array with empty string", () => {
+      expect(CustomChannelsSchema.safeParse(["UC123", ""]).success).toBe(false);
+    });
+
+    it("rejects non-array input", () => {
+      expect(CustomChannelsSchema.safeParse("not-array").success).toBe(false);
+    });
+  });
+
+  describe("Custom channel messages", () => {
+    describe("AddCustomMessageSchema", () => {
+      it("validates add_custom", () => {
+        expect(
+          AddCustomMessageSchema.safeParse({
+            action: "add_custom",
+            channelId: "UC123",
+          }).success,
+        ).toBe(true);
+      });
+
+      it("rejects missing channelId", () => {
+        expect(
+          AddCustomMessageSchema.safeParse({ action: "add_custom" }).success,
+        ).toBe(false);
+      });
+
+      it("rejects empty channelId", () => {
+        expect(
+          AddCustomMessageSchema.safeParse({
+            action: "add_custom",
+            channelId: "",
+          }).success,
+        ).toBe(false);
+      });
+    });
+
+    describe("RemoveCustomMessageSchema", () => {
+      it("validates remove_custom", () => {
+        expect(
+          RemoveCustomMessageSchema.safeParse({
+            action: "remove_custom",
+            channelId: "UC123",
+          }).success,
+        ).toBe(true);
+      });
+    });
+
+    describe("GetCustomMessageSchema", () => {
+      it("validates get_custom", () => {
+        expect(
+          GetCustomMessageSchema.safeParse({ action: "get_custom" }).success,
+        ).toBe(true);
+      });
+    });
+  });
+
   describe("ExtensionMessageSchema (discriminated union)", () => {
     it("accepts get_all", () => {
       expect(
@@ -230,6 +302,30 @@ describe("Extension messages", () => {
       expect(
         ExtensionMessageSchema.safeParse({ action: "set_all", enabled: false })
           .success,
+      ).toBe(true);
+    });
+
+    it("accepts add_custom", () => {
+      expect(
+        ExtensionMessageSchema.safeParse({
+          action: "add_custom",
+          channelId: "UC123",
+        }).success,
+      ).toBe(true);
+    });
+
+    it("accepts remove_custom", () => {
+      expect(
+        ExtensionMessageSchema.safeParse({
+          action: "remove_custom",
+          channelId: "UC123",
+        }).success,
+      ).toBe(true);
+    });
+
+    it("accepts get_custom", () => {
+      expect(
+        ExtensionMessageSchema.safeParse({ action: "get_custom" }).success,
       ).toBe(true);
     });
 
@@ -258,6 +354,12 @@ describe("TabUpdate schemas", () => {
     expect(SetUpdateSchema.safeParse({ type: "set" }).success).toBe(false);
   });
 
+  it("validates refresh update", () => {
+    expect(RefreshUpdateSchema.safeParse({ type: "refresh" }).success).toBe(
+      true,
+    );
+  });
+
   describe("TabUpdateSchema (discriminated union)", () => {
     it("accepts set_all", () => {
       expect(
@@ -269,6 +371,10 @@ describe("TabUpdate schemas", () => {
       expect(
         TabUpdateSchema.safeParse({ type: "set", groupId: "bbc" }).success,
       ).toBe(true);
+    });
+
+    it("accepts refresh", () => {
+      expect(TabUpdateSchema.safeParse({ type: "refresh" }).success).toBe(true);
     });
 
     it("rejects unknown type", () => {

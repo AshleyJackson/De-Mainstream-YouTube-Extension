@@ -21,6 +21,8 @@ const LegacyChannelSchema = z.object({
 });
 const LegacyChannelArraySchema = z.array(LegacyChannelSchema);
 
+const CustomChannelsSchema = z.array(z.string().min(1));
+
 const SetMsg = z.object({
   action: z.literal("set"),
   groupId: z.string().min(1),
@@ -35,16 +37,29 @@ const BadgeCountMsg = z.object({
   action: z.literal("badge_count"),
   count: z.number(),
 });
+const AddCustomMsg = z.object({
+  action: z.literal("add_custom"),
+  channelId: z.string().min(1),
+});
+const RemoveCustomMsg = z.object({
+  action: z.literal("remove_custom"),
+  channelId: z.string().min(1),
+});
+const GetCustomMsg = z.object({ action: z.literal("get_custom") });
 const ExtMsg = z.discriminatedUnion("action", [
   GetAllMsg,
   SetMsg,
   SetAllMsg,
   BadgeCountMsg,
+  AddCustomMsg,
+  RemoveCustomMsg,
+  GetCustomMsg,
 ]);
 
 // ── Storage ─────────────────────────────────────────────────
 
 const STORAGE_KEY = "demainstream";
+const CUSTOM_KEY = "customChannels";
 
 async function initStorage(): Promise<void> {
   log.info("Initializing storage...");
@@ -52,45 +67,53 @@ async function initStorage(): Promise<void> {
 
   if (ChannelGroupArraySchema.safeParse(raw).success) {
     log.info("Storage already in group format, nothing to do");
-    return;
-  }
+  } else {
+    const legacy = LegacyChannelArraySchema.safeParse(raw);
+    if (legacy.success) {
+      log.info("Migrating legacy format to group format", {
+        legacyCount: legacy.data.length,
+      });
 
-  const legacy = LegacyChannelArraySchema.safeParse(raw);
-  if (legacy.success) {
-    log.info("Migrating legacy format to group format", {
-      legacyCount: legacy.data.length,
-    });
-
-    const idToGroup = new Map<string, string>();
-    for (const group of CHANNEL_DEFINITIONS) {
-      for (const chId of group.channelIds) {
-        idToGroup.set(chId.toLowerCase(), group.id);
+      const idToGroup = new Map<string, string>();
+      for (const group of CHANNEL_DEFINITIONS) {
+        for (const chId of group.channelIds) {
+          idToGroup.set(chId.toLowerCase(), group.id);
+        }
       }
+
+      const enabledSet = new Set<string>();
+      for (const ch of legacy.data) {
+        if (ch.enabled) enabledSet.add(ch.id.toLowerCase());
+      }
+      log.debug("Legacy enabled IDs", { count: enabledSet.size });
+
+      const migrated = CHANNEL_DEFINITIONS.map((group) => {
+        const anyEnabled = group.channelIds.some((chId) =>
+          enabledSet.has(chId.toLowerCase()),
+        );
+        return { ...group, enabled: anyEnabled };
+      });
+
+      await chrome.storage.local.set({ [STORAGE_KEY]: migrated });
+      log.info("Migration complete", { groupCount: migrated.length });
+    } else {
+      log.warn("No valid data found, seeding defaults");
+      const defaults = CHANNEL_DEFINITIONS.map((ch) => ({
+        ...ch,
+        enabled: true,
+      }));
+      await chrome.storage.local.set({ [STORAGE_KEY]: defaults });
+      log.info("Defaults seeded", { groupCount: defaults.length });
     }
-
-    const enabledSet = new Set<string>();
-    for (const ch of legacy.data) {
-      if (ch.enabled) enabledSet.add(ch.id.toLowerCase());
-    }
-    log.debug("Legacy enabled IDs", { count: enabledSet.size });
-
-    const migrated = CHANNEL_DEFINITIONS.map((group) => {
-      // A group is enabled if ANY of its legacy-matching channelIds were enabled
-      const anyEnabled = group.channelIds.some((chId) =>
-        enabledSet.has(chId.toLowerCase()),
-      );
-      return { ...group, enabled: anyEnabled };
-    });
-
-    await chrome.storage.local.set({ [STORAGE_KEY]: migrated });
-    log.info("Migration complete", { groupCount: migrated.length });
-    return;
   }
 
-  log.warn("No valid data found, seeding defaults");
-  const defaults = CHANNEL_DEFINITIONS.map((ch) => ({ ...ch, enabled: true }));
-  await chrome.storage.local.set({ [STORAGE_KEY]: defaults });
-  log.info("Defaults seeded", { groupCount: defaults.length });
+  // Initialize custom channels if not present
+  const { [CUSTOM_KEY]: customRaw } =
+    await chrome.storage.local.get(CUSTOM_KEY);
+  if (!CustomChannelsSchema.safeParse(customRaw).success) {
+    log.info("Initializing custom channels as empty");
+    await chrome.storage.local.set({ [CUSTOM_KEY]: [] });
+  }
 }
 
 async function getGroups() {
@@ -106,6 +129,38 @@ async function getGroups() {
   });
   return CHANNEL_DEFINITIONS.map((ch) => ({ ...ch, enabled: true }));
 }
+
+async function getCustomChannels(): Promise<string[]> {
+  const { [CUSTOM_KEY]: raw } = await chrome.storage.local.get(CUSTOM_KEY);
+  const parsed = CustomChannelsSchema.safeParse(raw);
+  if (parsed.success) {
+    log.debug("Loaded custom channels", { count: parsed.data.length });
+    return parsed.data;
+  }
+  return [];
+}
+
+async function addCustomChannel(channelId: string): Promise<void> {
+  const existing = await getCustomChannels();
+  const lower = channelId.toLowerCase();
+  if (existing.some((id) => id.toLowerCase() === lower)) {
+    log.info("Custom channel already in list, skipping", { channelId });
+    return;
+  }
+  const updated = [...existing, channelId];
+  await chrome.storage.local.set({ [CUSTOM_KEY]: updated });
+  log.info("Added custom channel", { channelId, total: updated.length });
+}
+
+async function removeCustomChannel(channelId: string): Promise<void> {
+  const existing = await getCustomChannels();
+  const lower = channelId.toLowerCase();
+  const updated = existing.filter((id) => id.toLowerCase() !== lower);
+  await chrome.storage.local.set({ [CUSTOM_KEY]: updated });
+  log.info("Removed custom channel", { channelId, total: updated.length });
+}
+
+// ── YouTube tab helpers ─────────────────────────────────────
 
 async function sendYouTubeUpdate(data: unknown): Promise<void> {
   try {
@@ -161,6 +216,50 @@ async function setAllGroupsEnabled(enabled: boolean): Promise<void> {
   log.info("All groups updated", { enabled, groupCount: updated.length });
 }
 
+// ── Context menu ────────────────────────────────────────────
+
+const CONTEXT_MENU_ID = "demainstream-block";
+
+function createContextMenu(): void {
+  chrome.contextMenus.create({
+    id: CONTEXT_MENU_ID,
+    title: "Add to De-Mainstream block list",
+    contexts: ["link"],
+    targetUrlPatterns: ["*://*.youtube.com/*"],
+  });
+  log.info("Context menu created", { id: CONTEXT_MENU_ID });
+}
+
+/**
+ * Extract a channel ID or handle from a YouTube channel URL.
+ * Supports:
+ *   /channel/UC123
+ *   /@handle
+ *   /user/username
+ */
+function extractChannelIdFromUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    const path = parsed.pathname;
+
+    // /channel/UC123 → UC123
+    const channelMatch = path.match(/^\/channel\/([^/]+)/);
+    if (channelMatch) return channelMatch[1];
+
+    // /@handle → @handle
+    const handleMatch = path.match(/^\/@([^/]+)/);
+    if (handleMatch) return "@" + handleMatch[1];
+
+    // /user/username → username
+    const userMatch = path.match(/^\/user\/([^/]+)/);
+    if (userMatch) return userMatch[1];
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 // ── Runtime message handler ─────────────────────────────────
 
 chrome.runtime.onMessage.addListener(
@@ -208,6 +307,31 @@ chrome.runtime.onMessage.addListener(
         sendResponse({ success: true });
         return false;
       }
+
+      case "add_custom": {
+        const msg = parsed.data;
+        addCustomChannel(msg.channelId).then(() => {
+          sendYouTubeUpdate({ type: "refresh" });
+          sendResponse({ success: true });
+        });
+        return true;
+      }
+
+      case "remove_custom": {
+        const msg = parsed.data;
+        removeCustomChannel(msg.channelId).then(() => {
+          sendYouTubeUpdate({ type: "refresh" });
+          sendResponse({ success: true });
+        });
+        return true;
+      }
+
+      case "get_custom": {
+        getCustomChannels().then((channels) => {
+          sendResponse(channels);
+        });
+        return true;
+      }
     }
   },
 );
@@ -218,6 +342,27 @@ chrome.runtime.onInstalled.addListener((details) => {
     previousVersion: details.previousVersion,
   });
   initStorage();
+  createContextMenu();
+});
+
+// Listen for context menu clicks
+chrome.contextMenus.onClicked.addListener((info) => {
+  if (info.menuItemId === CONTEXT_MENU_ID && info.linkUrl) {
+    const channelId = extractChannelIdFromUrl(info.linkUrl);
+    if (channelId) {
+      log.info("Context menu: adding custom channel", {
+        channelId,
+        linkUrl: info.linkUrl,
+      });
+      addCustomChannel(channelId).then(() => {
+        sendYouTubeUpdate({ type: "refresh" });
+      });
+    } else {
+      log.warn("Context menu: could not extract channel ID from URL", {
+        linkUrl: info.linkUrl,
+      });
+    }
+  }
 });
 
 log.info("Background service worker started");

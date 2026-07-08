@@ -2,7 +2,7 @@
   "name": "De-Mainstream YouTube™",
   "short_name": "De-Mainstream",
   "description": "Fixes the YouTube™ algorithm to remove mainstream media results from searches.",
-  "version": "1.0.4",
+  "version": "1.1.0",
   "manifest_version": 3,
   "icons": {
     "16": "img/icons/icon@1x.png",
@@ -20,7 +20,10 @@
       "128": "img/icons/icon@8x.png"
     }
   },
-  "permissions": ["storage"],
+  "permissions": [
+    "storage",
+    "contextMenus"
+  ],
   "host_permissions": ["https://*.youtube.com/*"],
   "content_scripts": [
     {

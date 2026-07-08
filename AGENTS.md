@@ -66,7 +66,30 @@ Example: the `cbs` group contains `CBS`, `CBSNewsOnline`, `CBSEveningNews`, `CBS
 - All runtime-validated types live in `src/lib/types.ts` using zod
 - `src/extension/types.ts` has plain TS interfaces for esbuild-bundled code (avoids bundling zod into the service worker)
 
-### Test conventions
+### Custom channels (right-click context menu)
+
+Users can right-click any YouTube channel link and select **"Add to De-Mainstream block list"** to block a channel not in the predefined groups.
+
+### How it works
+
+1. **Background** (`src/extension/background.ts`): Creates a `chrome.contextMenus` item on install. Click handler extracts channel ID from link URL (`/channel/UC...`, `/@handle`, `/user/...`), stores it in `chrome.storage.local` under the `"customChannels"` key, and sends a `{ type: "refresh" }` update to YouTube tabs.
+
+2. **Content script** (`src/extension/youtube.ts`): Fetches both groups and custom channels. Custom channel IDs are appended to `blockedChannelIds[]`. The `"refresh"` update type triggers a full re-fetch of both sources.
+
+3. **Popup** (`src/routes/+page.svelte`): A separate "Custom" tab (only visible when the list is non-empty) shows channel IDs with a Remove button.
+
+### Storage
+
+- Key: `"customChannels"` — validated via `CustomChannelsSchema` (zod `z.array(z.string().min(1))`)
+- No migration needed — initialized as `[]` on first run
+- Deduplication by lowercase comparison
+
+### When adding custom channel tests
+
+- Mock `chrome.contextMenus.create` and `chrome.contextMenus.onClicked.addListener` in `vitest.setup.ts`
+- Use the `CUSTOM_KEY = "customChannels"` constant in tests
+
+## Test conventions
 
 - Tests live in `tests/` directory
 - All chrome.* APIs are mocked via `vitest.setup.ts`

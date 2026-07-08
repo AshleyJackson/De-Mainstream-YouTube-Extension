@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const STORAGE_KEY = "demainstream";
+const CUSTOM_KEY = "customChannels";
 
 type StoredGroup = {
   id: string;
@@ -14,6 +15,12 @@ function getLastSetCall(): Record<string, StoredGroup[]> {
   const calls = mockChrome.storage.local.set.mock.calls as unknown as Array<
     [Record<string, StoredGroup[]>]
   >;
+  // Find the last call that has STORAGE_KEY (skip customChannels calls)
+  for (let i = calls.length - 1; i >= 0; i--) {
+    if (calls[i][0][STORAGE_KEY as keyof (typeof calls)[0][0]] !== undefined) {
+      return calls[i][0];
+    }
+  }
   return calls[calls.length - 1][0];
 }
 
@@ -42,6 +49,12 @@ function createChromeMock() {
     action: {
       setBadgeText: vi.fn(),
       setBadgeBackgroundColor: vi.fn(),
+    },
+    contextMenus: {
+      create: vi.fn(() => Promise.resolve()),
+      onClicked: {
+        addListener: vi.fn(),
+      },
     },
   };
 }
@@ -112,7 +125,10 @@ describe("background service worker", () => {
         enabled: false,
       },
     ];
-    mockChrome.storage.local.get.mockResolvedValue({ [STORAGE_KEY]: existing });
+    mockChrome.storage.local.get.mockResolvedValue({
+      [STORAGE_KEY]: existing,
+      [CUSTOM_KEY]: [],
+    });
     mockChrome.storage.local.set.mockResolvedValue(undefined);
 
     await import("../../src/extension/background");
@@ -348,6 +364,181 @@ describe("background service worker", () => {
       expect(response).toEqual({ success: true });
       expect(mockChrome.action.setBadgeText).toHaveBeenCalledWith({ text: "" });
       expect(mockChrome.action.setBadgeBackgroundColor).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("custom channel handlers", () => {
+    it("add_custom stores a new channel", async () => {
+      mockChrome.storage.local.get.mockResolvedValue({
+        [STORAGE_KEY]: [],
+        [CUSTOM_KEY]: [],
+      });
+      mockChrome.storage.local.set.mockResolvedValue(undefined);
+
+      await import("../../src/extension/background");
+
+      const response = await new Promise<unknown>((resolve) => {
+        const keepsOpen = onMessageListener?.(
+          { action: "add_custom", channelId: "UC123" },
+          null,
+          resolve,
+        );
+        expect(keepsOpen).toBe(true);
+      });
+
+      expect(response).toEqual({ success: true });
+
+      // Should have stored the custom channel
+      const setCalls = mockChrome.storage.local.set.mock.calls as unknown[][];
+      const call = setCalls.find(
+        (call) =>
+          (call[0] as Record<string, unknown>)[CUSTOM_KEY] !== undefined,
+      );
+      expect(call).toBeDefined();
+      expect((call![0] as Record<string, unknown>)[CUSTOM_KEY]).toEqual([
+        "UC123",
+      ]);
+    });
+
+    it("add_custom deduplicates by lowercase", async () => {
+      const store: Record<string, unknown> = {
+        [STORAGE_KEY]: [],
+        [CUSTOM_KEY]: ["UC123"],
+      };
+      const getMock = vi.fn(
+        (keys: string | string[] | Record<string, unknown> | null) => {
+          if (typeof keys === "string") {
+            return Promise.resolve({ [keys]: store[keys] ?? null });
+          }
+          return Promise.resolve({});
+        },
+      );
+      const setMock = vi.fn((items: Record<string, unknown>) => {
+        Object.assign(store, items);
+        return Promise.resolve();
+      });
+      mockChrome.storage.local.get =
+        getMock as unknown as typeof mockChrome.storage.local.get;
+      mockChrome.storage.local.set =
+        setMock as unknown as typeof mockChrome.storage.local.set;
+
+      await import("../../src/extension/background");
+
+      await new Promise<unknown>((resolve) => {
+        onMessageListener?.(
+          { action: "add_custom", channelId: "uc123" },
+          null,
+          resolve,
+        );
+      });
+
+      // Should not have added duplicate
+      const stored = store[CUSTOM_KEY] as string[];
+      expect(stored).toEqual(["UC123"]);
+    });
+
+    it("get_custom returns stored channels", async () => {
+      const store: Record<string, unknown> = {
+        [STORAGE_KEY]: [],
+        [CUSTOM_KEY]: ["UC123", "BBC"],
+      };
+      const getMock = vi.fn(
+        (keys: string | string[] | Record<string, unknown> | null) => {
+          if (typeof keys === "string") {
+            return Promise.resolve({ [keys]: store[keys] ?? null });
+          }
+          return Promise.resolve({});
+        },
+      );
+      mockChrome.storage.local.get =
+        getMock as unknown as typeof mockChrome.storage.local.get;
+
+      await import("../../src/extension/background");
+
+      const response = await new Promise<unknown>((resolve) => {
+        const keepsOpen = onMessageListener?.(
+          { action: "get_custom" },
+          null,
+          resolve,
+        );
+        expect(keepsOpen).toBe(true);
+      });
+
+      expect(response).toEqual(["UC123", "BBC"]);
+    });
+
+    it("remove_custom removes a channel", async () => {
+      const store: Record<string, unknown> = {
+        [STORAGE_KEY]: [],
+        [CUSTOM_KEY]: ["UC123", "BBC"],
+      };
+      const getMock = vi.fn(
+        (keys: string | string[] | Record<string, unknown> | null) => {
+          if (typeof keys === "string") {
+            return Promise.resolve({ [keys]: store[keys] ?? null });
+          }
+          return Promise.resolve({});
+        },
+      );
+      const setMock = vi.fn((items: Record<string, unknown>) => {
+        Object.assign(store, items);
+        return Promise.resolve();
+      });
+      mockChrome.storage.local.get =
+        getMock as unknown as typeof mockChrome.storage.local.get;
+      mockChrome.storage.local.set =
+        setMock as unknown as typeof mockChrome.storage.local.set;
+
+      await import("../../src/extension/background");
+
+      const response = await new Promise<unknown>((resolve) => {
+        const keepsOpen = onMessageListener?.(
+          { action: "remove_custom", channelId: "UC123" },
+          null,
+          resolve,
+        );
+        expect(keepsOpen).toBe(true);
+      });
+
+      expect(response).toEqual({ success: true });
+      const stored = store[CUSTOM_KEY] as string[];
+      expect(stored).toEqual(["BBC"]);
+    });
+
+    it("remove_custom handles case-insensitive match", async () => {
+      const store: Record<string, unknown> = {
+        [STORAGE_KEY]: [],
+        [CUSTOM_KEY]: ["UC123"],
+      };
+      const getMock = vi.fn(
+        (keys: string | string[] | Record<string, unknown> | null) => {
+          if (typeof keys === "string") {
+            return Promise.resolve({ [keys]: store[keys] ?? null });
+          }
+          return Promise.resolve({});
+        },
+      );
+      const setMock = vi.fn((items: Record<string, unknown>) => {
+        Object.assign(store, items);
+        return Promise.resolve();
+      });
+      mockChrome.storage.local.get =
+        getMock as unknown as typeof mockChrome.storage.local.get;
+      mockChrome.storage.local.set =
+        setMock as unknown as typeof mockChrome.storage.local.set;
+
+      await import("../../src/extension/background");
+
+      await new Promise<unknown>((resolve) => {
+        onMessageListener?.(
+          { action: "remove_custom", channelId: "uc123" },
+          null,
+          resolve,
+        );
+      });
+
+      const stored = store[CUSTOM_KEY] as string[];
+      expect(stored).toEqual([]);
     });
   });
 

@@ -60,11 +60,43 @@ interface ChannelGroup {
     });
   }
 
+  function getCustomChannels(callback?: () => void): void {
+    log.debug("Fetching custom channels from background...");
+    chrome.runtime.sendMessage({ action: "get_custom" }, (values: unknown) => {
+      if (!Array.isArray(values)) {
+        log.warn("Received non-array custom channels response", {
+          type: typeof values,
+        });
+        callback?.();
+        return;
+      }
+      if (values.length > 0) {
+        const lower = values.map((id: string) => id.toLowerCase());
+        log.info("Loaded custom channels", { count: lower.length });
+        blockedChannelIds = [...blockedChannelIds, ...lower];
+      } else {
+        log.debug("No custom channels to add");
+      }
+      callback?.();
+    });
+  }
+
+  function refreshBlockedLists(callback?: () => void): void {
+    // Reset and re-fetch both groups and custom channels
+    getGroups(() => {
+      getCustomChannels(callback);
+    });
+  }
+
   getGroups(() => {
     log.info("Initial groups loaded, filtering");
     // Clear badge on fresh page load (totalRemovedCount starts at 0)
     chrome.runtime.sendMessage({ action: "badge_count", count: 0 });
-    waitForVideoResults();
+    // Also fetch custom channels
+    getCustomChannels(() => {
+      log.info("Custom channels loaded, initial filtering");
+      waitForVideoResults();
+    });
   });
 
   searchForm?.addEventListener(
@@ -85,7 +117,18 @@ interface ChannelGroup {
 
   chrome.runtime.onMessage.addListener((msg: unknown) => {
     log.debug("Content script received update message", msg);
-    getGroups(() => waitForVideoResults());
+    if (
+      msg &&
+      typeof msg === "object" &&
+      "type" in msg &&
+      (msg as { type: string }).type === "refresh"
+    ) {
+      // Full refresh: re-fetch groups + custom channels
+      refreshBlockedLists(() => waitForVideoResults());
+    } else {
+      // Legacy update types: just re-fetch groups
+      getGroups(() => waitForVideoResults());
+    }
     return true;
   });
 
